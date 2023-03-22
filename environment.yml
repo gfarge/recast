@@ -16,9 +16,9 @@ dependencies:
   - requests==2.27.1
   - tqdm==4.62.3
   - urllib3==1.26.8
-  - cudatoolkit=11.3
+  - cudatoolkit=11.3  # on osx, version should be lower, so unspecifying it works
   - pip:
     - pytorch-lightning==1.5.9
     - setuptools==59.5.0
     - sacred==0.8.2
-    - wandb==0.12.10
+    - wandb  #==0.12.10 # deactivated, it causes errors...
