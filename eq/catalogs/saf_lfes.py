@@ -7,7 +7,7 @@ import pandas as pd
 import requests
 import torch
 
-from eq.data import Catalog, InMemoryDataset, Sequence
+from eq.data import Catalog, InMemoryDataset, Sequence, default_catalogs_dir
 
 from .utils import train_val_test_split_sequence
 
@@ -19,7 +19,7 @@ COL_NAMES = [ "year", "month", "day", "s_of_day", "hour", "minute", "second", "c
 
 class SAF_LFES(Catalog):
     def __init__(self,
-        root_dir: Union[str, Path],
+        root_dir: Union[str, Path] = default_catalogs_dir / "SAF_LFES",
         mag_completeness: float = 1.0,
         train_start_ts: pd.Timestamp = pd.Timestamp("2006-01-01"),
         val_start_ts: pd.Timestamp = pd.Timestamp("2012-01-01"),
@@ -85,7 +85,7 @@ class SAF_LFES(Catalog):
 
         t_start = 0.0
         t_end = (end_ts - start_ts) / pd.Timedelta("1 day")
-        arrival_times = ((subset_df.date - start_ts) / pd.Timedelta("1 day")).values
+        arrival_times = ((raw_df.date - start_ts) / pd.Timedelta("1 day")).values
         inter_times = np.diff(arrival_times, prepend=[t_start], append=[t_end])
         seq = Sequence(
             inter_times=torch.as_tensor(inter_times, dtype=torch.float32),

@@ -3,3 +3,4 @@ from .qtm import QTMSaltonSea, QTMSanJacinto
 from .scedc import SCEDC
 from .synthetic_etas import ETAS_MultiCatalog, ETAS_SingleCatalog, ToyETAS
 from .white import White
+from .saf_lfes import SAF_LFES
