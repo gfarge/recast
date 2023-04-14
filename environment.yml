@@ -1,4 +1,4 @@
-name: eq  
+name: eq  # to reproduce, just change the name to something else
 channels:
   - pytorch
   - defaults
