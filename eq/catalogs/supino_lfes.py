@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Union
 
 import numpy as np
+import datetime as dt
 import pandas as pd
 import requests
 import torch
@@ -11,26 +12,24 @@ from eq.data import Catalog, InMemoryDataset, Sequence, default_catalogs_dir
 
 from .utils import train_val_test_split_sequence
 
-CAT_PATH = '/home/gafarge/projects/data/catalogs/saf_lfes_shelly17.txt'
-# sorry about this, make url work, but I can't... :
-# https://agupubs.onlinelibrary.wiley.com/action/downloadSupplement?doi=10.1002%2F2017JB014047&file=jgrb52060-sup-0002-DataS1.txt
+COL_NAMES = ["event_id", "log_M0", "std_log", "fc", "std_fc", "gamma", "std_ga", "lat", "lon", "depth", "date_str"]
 
-COL_NAMES = [ "year", "month", "day", "s_of_day", "hour", "minute", "second", "ccsum", "meancc", "med_cc", "seqday", "ID", "latitude", "longitude", "depth", "n_chan" ]
+class Supino_LFEs(Catalog):
+    url = "https://dataverse.harvard.edu/api/access/datafile/:persistentId?persistentId=doi:10.7910/DVN/HCWJUI/LLGGXH"
 
-class SAF_LFEs(Catalog):
     def __init__(self,
-        root_dir: Union[str, Path] = default_catalogs_dir / "SAF_LFEs",
+        root_dir: Union[str, Path] = default_catalogs_dir / "Supino_LFEs",
         mag_completeness: float = 1.0,
-        train_start_ts: pd.Timestamp = pd.Timestamp("2006-01-01"),
-        val_start_ts: pd.Timestamp = pd.Timestamp("2012-01-01"),
-        test_start_ts: pd.Timestamp = pd.Timestamp("2014-01-01"),
+        train_start_ts: pd.Timestamp = pd.Timestamp("2014-02-01"),
+        val_start_ts: pd.Timestamp = pd.Timestamp("2015-03-01"),
+        test_start_ts: pd.Timestamp = pd.Timestamp("2015-11-01"),
     ):
         metadata = {
-            "name": f"ShellyEtAl",
+            "name": f"SupinoEtAl",
             "freq": "1D",
             "mag_completeness": mag_completeness,
-            "start_ts": pd.Timestamp("2001-04-06"),
-            "end_ts": pd.Timestamp("2016-09-20")
+            "start_ts": pd.Timestamp("2014-02-01"),
+            "end_ts": pd.Timestamp("2016-11-09")
         }
         super().__init__(root_dir=root_dir, metadata=metadata)
 
@@ -60,22 +59,27 @@ class SAF_LFEs(Catalog):
 
     def generate_catalog(self):
         print("Downloading...")
-
+        stream = requests.get(self.url).content
         raw_df = pd.read_csv(
-            CAT_PATH,
+            io.StringIO(stream.decode("utf-8")),
             names=COL_NAMES,
-            comment='%',
-            delim_whitespace=True,
-            index_col=False
+            skiprows=1,
+            sep='\t'
             )
-        raw_df["date"] = pd.to_datetime(raw_df[["year", "month", "day", "hour",
-            "minute", "second"]])
+        print("Processing...")
+        raw_df["date"] = pd.to_datetime(raw_df['date_str'],
+                format='%Y-%m-%d_%H:%M:%S.%f')
         raw_df.sort_values(by=["date"], inplace=True)
 
-        print("Processing...")
-        # LFEs do not have magnitude in this catalog... let's make a fake one
-        mag = [1 for ii in range(raw_df.shape[0])]
+        # >> Find and remove exact duplicates
+        raw_df.drop(np.where(raw_df.duplicated(["date"]))[0], inplace=True)
+        raw_df.drop(np.where(raw_df["date"]<dt.datetime(2014, 2, 1))[0],
+                inplace=True)
+        raw_df.index = [ii for ii in range(len(raw_df))]
+
         timestamps = raw_df.date.to_numpy()
+
+        mag = 2/3 * raw_df.log_M0.values - 6.07
 
         # Compute inter-event times
         start_ts = np.datetime64(self.metadata["start_ts"])
