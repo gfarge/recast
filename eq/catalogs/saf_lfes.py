@@ -21,9 +21,9 @@ class SAF_LFEs(Catalog):
     def __init__(self,
         root_dir: Union[str, Path] = default_catalogs_dir / "SAF_LFEs",
         mag_completeness: float = 1.0,
-        train_start_ts: pd.Timestamp = pd.Timestamp("2006-01-01"),
-        val_start_ts: pd.Timestamp = pd.Timestamp("2012-01-01"),
-        test_start_ts: pd.Timestamp = pd.Timestamp("2014-01-01"),
+        train_start_ts: pd.Timestamp = pd.Timestamp("2010-01-01"),
+        val_start_ts: pd.Timestamp = pd.Timestamp("2013-01-01"),
+        test_start_ts: pd.Timestamp = pd.Timestamp("2015-01-01"),
     ):
         metadata = {
             "name": f"ShellyEtAl",
