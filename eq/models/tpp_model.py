@@ -11,6 +11,9 @@ class TPPModel(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
 
+        self.logged_train_loss = []
+        self.logged_val_loss = []
+
     def nll_loss(self, batch: eq.data.Batch) -> torch.Tensor:
         """
         Compute negative log-likelihood (NLL) for a batch of event sequences.
@@ -89,6 +92,7 @@ class TPPModel(pl.LightningModule):
             on_epoch=True,
             batch_size=batch.batch_size,
         )
+        self.logged_train_loss.append(loss.item())
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -101,6 +105,7 @@ class TPPModel(pl.LightningModule):
             on_epoch=True,
             batch_size=batch.batch_size,
         )
+        self.logged_val_loss.append(loss.item())
 
     def test_step(self, batch, batch_idx, dataset_idx=None):
         with torch.no_grad():
