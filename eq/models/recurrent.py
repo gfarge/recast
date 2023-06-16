@@ -222,6 +222,7 @@ class RecurrentTPP(TPPModel):
                 next_inter_times -= time_remaining
                 time_remaining = None
             next_inter_times.clamp_max_(t_end - t_start)
+            next_inter_times.clamp_min_(1e-8)
             inter_times = torch.cat([inter_times, next_inter_times], dim=1)  # (B, L)
             # Prepare RNN input
             rnn_input_list = [self.encode_time(next_inter_times)]
