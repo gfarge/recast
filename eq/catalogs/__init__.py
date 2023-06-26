@@ -5,3 +5,4 @@ from .synthetic_etas import ETAS_MultiCatalog, ETAS_SingleCatalog, ToyETAS
 from .white import White
 from .saf_lfes import SAF_LFEs
 from .supino_lfes import Supino_LFEs
+from .synthetic_hawkes import Hawkes_SingleCatalog
