@@ -194,6 +194,7 @@ class ETAS(TPPModel):
                     prog_bar=True,
                     batch_size=batch.batch_size,
                 )
+        self.logged_train_loss.append(loss.item())
         return loss
 
     def sample_thinning(
