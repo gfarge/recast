@@ -27,3 +27,6 @@ comment.cut
 .DS_Store
 
 *lightning_logs
+
+# Things to hide
+*_hide_*
