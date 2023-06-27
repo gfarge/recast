@@ -117,7 +117,7 @@ class Hawkes(TPPModel):
 
     def kernel(self, time):
         """Computes the kernel for the input time"""
-        return self.k / (self.c + time) **(-self.p)
+        return self.k / (self.c + time) ** (self.p)
 
     def nll_loss(self, batch: eq.data.Batch) -> torch.Tensor:
         """
