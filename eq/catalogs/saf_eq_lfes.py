@@ -12,23 +12,23 @@ from eq.data import Catalog, InMemoryDataset, Sequence, default_catalogs_dir
 
 from .utils import train_val_test_split_sequence
 
-PATH = '/home/gafarge/projects/data/catalogs/parkfield_eq_lfe.dat'
+PATH = '/home/gafarge/projects/data/Catalogs/parkfield_eq_lfe/saf_eq_lfe.csv'
 
 class SAF_EQ_LFEs(Catalog):
 
     def __init__(self,
         root_dir: Union[str, Path] = default_catalogs_dir / "SAF_EQ_LFEs",
         mag_completeness: float = 0,
-        train_start_ts: pd.Timestamp = pd.Timestamp("2002-01-01"),
-        val_start_ts: pd.Timestamp = pd.Timestamp("2007-09-14"),
-        test_start_ts: pd.Timestamp = pd.Timestamp("2009-11-06"),
+        train_start_ts: pd.Timestamp = pd.Timestamp("2004-01-01"),
+        val_start_ts: pd.Timestamp = pd.Timestamp("2015-05-27"),
+        test_start_ts: pd.Timestamp = pd.Timestamp("2019-03-15"),
     ):
         metadata = {
-            "name": f"SupinoEtAl",
+            "name": f"saf_eq_lfe",
             "freq": "1D",
             "mag_completeness": mag_completeness,
-            "start_ts": pd.Timestamp("2001-04-06"),
-            "end_ts": pd.Timestamp("2012-01-01")
+            "start_ts": pd.Timestamp("2004-01-01"),
+            "end_ts": pd.Timestamp("2023-01-01")
         }
         super().__init__(root_dir=root_dir, metadata=metadata)
 
@@ -60,14 +60,19 @@ class SAF_EQ_LFEs(Catalog):
         print("Downloading...")
         raw_df = pd.read_csv(
                 PATH,
-                sep='\t'
+                skiprows=12,
+                parse_dates=["date"]
             )
-        print("Processing...")
-        raw_df["date"] = pd.to_datetime(raw_df['date'], format='%Y-%m-%dT%H:%M:%S')
+        
+        print("Processin...")
+        raw_df = raw_df[raw_df.date >= self.metadata["start_ts"]]
+
+        raw_df.drop_duplicates(subset=["date"], inplace=True)
+        raw_df.sort_values(by="date", inplace=True)
+        raw_df.reset_index(drop=True, inplace=True)
 
         timestamps = raw_df.date.to_numpy()
         mag = raw_df.mag.to_numpy()
-        label = raw_df.label.to_numpy()
 
         # Compute inter-event times
         start_ts = np.datetime64(self.metadata["start_ts"])
@@ -82,7 +87,6 @@ class SAF_EQ_LFEs(Catalog):
         seq = Sequence(
             inter_times=torch.as_tensor(inter_times, dtype=torch.float32),
             mag=torch.as_tensor(mag, dtype=torch.float32),
-            label=torch.as_tensor(label, dtype=torch.int8)
         )
         dataset = InMemoryDataset(sequences=[seq])
         dataset.save_to_disk(self.root_dir / "full_sequence.pt")
