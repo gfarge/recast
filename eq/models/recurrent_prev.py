@@ -17,7 +17,6 @@ class RecurrentTPP(TPPModel):
     Args:
         input_magnitude: Should magnitude be used as model input?
         predict_magnitude: Should the model predict the magnitude?
-        num_extra_features: Number of extra features to use as input.
         context_size: Size of the RNN hidden state.
         num_components: Number of mixture components in the output distribution.
         rnn_type: Type of the RNN. Possible choices {'GRU', 'RNN'}
@@ -33,7 +32,6 @@ class RecurrentTPP(TPPModel):
         self,
         input_magnitude: bool = True,
         predict_magnitude: bool = True,
-        num_extra_features: Optional[int] = None,
         context_size: int = 32,
         num_components: int = 32,
         rnn_type: str = "GRU",
@@ -47,7 +45,6 @@ class RecurrentTPP(TPPModel):
         super().__init__()
         self.input_magnitude = input_magnitude
         self.predict_magnitude = predict_magnitude
-        self.num_extra_features = num_extra_features
         self.context_size = context_size
         self.num_components = num_components
         self.register_buffer("tau_mean", torch.tensor(tau_mean, dtype=torch.float32))
@@ -73,12 +70,7 @@ class RecurrentTPP(TPPModel):
             raise ValueError(
                 f"rnn_type must be one of ['RNN', 'GRU'] " f"(got {rnn_type})"
             )
-        self.num_rnn_inputs = (
-            1  # inter-event times
-            + int(self.input_magnitude)  # magnitude features
-            + 0 if self.num_extra_features is None else self.num_extra_features
-        )
-
+        self.num_rnn_inputs = 1 + int(input_magnitude)
         self.rnn = getattr(nn, rnn_type)(
             self.num_rnn_inputs, context_size, batch_first=True
         )
@@ -95,13 +87,6 @@ class RecurrentTPP(TPPModel):
         # output has shape (..., 1)
         return mag.unsqueeze(-1) - self.mag_mean
 
-    def encode_extra_features(self, extra_feat):
-        # Place holder for any encoding of extra features that may be needed
-        # e.g. normalization, log-transform, aggregation, etc.
-        # extra_feat has shape (..., num_extra_features)
-        # output has shape (..., num_extra_features)
-        return extra_feat
-
     def get_context(self, batch):
         """Get context embedding for each event in the batch of padded sequences.
 
@@ -111,8 +96,6 @@ class RecurrentTPP(TPPModel):
         feat_list = [self.encode_time(batch.inter_times)]
         if self.input_magnitude:
             feat_list.append(self.encode_magnitude(batch.mag))
-        if self.num_extra_features is not None:
-            feat_list.append(self.encode_extra_features(batch.extra_feat))
         features = torch.cat(feat_list, dim=-1)
 
         rnn_output = self.rnn(features)[0][:, :-1, :]
@@ -140,12 +123,14 @@ class RecurrentTPP(TPPModel):
         )
 
     def get_magnitude_dist(self, context):
+        # TODO: log_rate isn't used, the magnitude distribution isn't conditioned on
+        # the history
         log_rate = self.hypernet_mag(context).squeeze(-1)  # (B, L)
         b = self.richter_b * torch.ones_like(log_rate)
         mag_min = self.mag_completeness * torch.ones_like(log_rate)
         return dist.GutenbergRichter(b=b, mag_min=mag_min)
 
-    def nll_loss(self, batch: eq.data.Batch, nll_mask: torch.Tensor = None) -> torch.Tensor:   
+    def nll_loss(self, batch: eq.data.Batch) -> torch.Tensor:
         """
         Compute negative log-likelihood (NLL) for a batch of event sequences.
 
@@ -156,19 +141,10 @@ class RecurrentTPP(TPPModel):
             nll: NLL of each sequence, shape (batch_size,)
         """
         context = self.get_context(batch)  # (B, L, C)
-        
         # Inter-event times
         inter_time_dist = self.get_inter_time_dist(context)
         log_pdf = inter_time_dist.log_prob(batch.inter_times.clamp_min(1e-10))  # (B, L)
-        
-        if nll_mask is not None:
-            log_surv = inter_time_dist.log_survival(batch.inter_times)  # (B, L)
-            log_like = (
-                (log_pdf * batch.mask * nll_mask).sum(-1) +     # likelihood of events
-                (log_surv * batch.mask * ~ nll_mask.bool()).sum(-1)     # likelihood of no events up to nll events
-            )
-        else:
-            log_like = (log_pdf * batch.mask).sum(-1)
+        log_like = (log_pdf * batch.mask).sum(-1)
 
         # Survival time from last event until t_end
         arange = torch.arange(batch.batch_size)
@@ -217,9 +193,6 @@ class RecurrentTPP(TPPModel):
             raise ValueError(
                 "Sampling is impossible if input_magnitude != predict_magnitude"
             )
-        if self.num_extra_features is not None:
-            raise ValueError("Sampling is not currently supported for extra features")
-
         if past_seq is not None:
             t_start = past_seq.t_end
             past_batch = eq.data.Batch.from_list([past_seq])
@@ -249,6 +222,7 @@ class RecurrentTPP(TPPModel):
                 next_inter_times -= time_remaining
                 time_remaining = None
             next_inter_times.clamp_max_(t_end - t_start)
+            next_inter_times.clamp_min_(1e-8)
             inter_times = torch.cat([inter_times, next_inter_times], dim=1)  # (B, L)
             # Prepare RNN input
             rnn_input_list = [self.encode_time(next_inter_times)]

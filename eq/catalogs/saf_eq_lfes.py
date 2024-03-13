@@ -64,7 +64,7 @@ class SAF_EQ_LFEs(Catalog):
                 parse_dates=["date"]
             )
         
-        print("Processin...")
+        print("Processing...")
         raw_df = raw_df[raw_df.date >= self.metadata["start_ts"]]
 
         raw_df.drop_duplicates(subset=["date"], inplace=True)
